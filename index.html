@@ -159,6 +159,9 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
 
 <!-- PIPELINE -->
 <div class="tab active" id="tab-pipe">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:4px">
+    <button class="btn solid" onclick="openAgencyForm()">+ Add agency</button>
+  </div>
   <div id="pipeList"></div>
   <p class="note">Stages advance automatically when you generate emails. Follow-up 1 becomes due 4 days after outreach; Follow-up 2 due 5 days after that. Add each agency's retail-leasing contact email once — it's saved for all future emails. Data is stored privately in this chat's storage.</p>
 </div>
@@ -227,6 +230,30 @@ button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,te
       <button class="btn ghost" onclick="closeModal()">Close</button>
     </div>
     <p class="note" style="margin-top:8px">Email apps can't auto-attach files from a link — click <b>Download brief PDF</b>, then drag the file into the email before sending. The template already references the attachment.</p>
+  </div>
+</div>
+
+<!-- ADD AGENCY MODAL -->
+<div class="overlay" id="agOverlay">
+  <div class="modal">
+    <h3>Add agency</h3>
+    <div class="fgrid" style="margin-top:10px">
+      <div class="full"><label>Agency / landlord name *</label><input id="ag_name" placeholder="e.g. Provident Estate — Commercial"></div>
+      <div><label>Region / group *</label><select id="ag_group">
+        <option>Dubai — Agencies</option>
+        <option>Abu Dhabi — Agencies</option>
+        <option>Mall Landlords — Direct</option>
+      </select></div>
+      <div><label>Website</label><input id="ag_web" placeholder="e.g. providentestate.com"></div>
+      <div class="full"><label>Focus / notes</label><input id="ag_focus" placeholder="e.g. Retail leasing specialist — JLT & Marina stock"></div>
+      <div><label>Contact name</label><input id="ag_contact" placeholder="optional"></div>
+      <div><label>Retail leasing email</label><input id="ag_email" placeholder="leasing@…"></div>
+      <div><label>Phone</label><input id="ag_phone" placeholder="+971 …"></div>
+    </div>
+    <div class="actions" style="display:flex;gap:8px;margin-top:14px">
+      <button class="btn solid" onclick="saveAgency()">Add to pipeline</button>
+      <button class="btn ghost" onclick="closeAgencyForm()">Cancel</button>
+    </div>
   </div>
 </div>
 
@@ -491,14 +518,15 @@ function renderPipe(){
       else if(due==="Follow-up 2 due"||a.stage==="Follow-up 1 sent") nextBtn='<button class="btn'+(due?' solid':'')+'" onclick="openEmail(\''+a.id+'\',\'fu2\')">Follow-up 2</button>';
       else if(a.stage==="Follow-up 2 sent") nextBtn='<button class="btn ghost" onclick="setStage(\''+a.id+'\',\'No fit / closed\')">Close out</button>';
       html+='<div class="agency'+(due?' due':'')+'">'+
-        '<div><div class="name">'+esc(a.name)+'</div><div class="focus">'+esc(a.focus)+'</div>'+
-        '<a class="web" href="https://'+a.web+'" target="_blank" rel="noopener">'+a.web+'</a>'+
+        '<div><div class="name">'+esc(a.name)+(a.custom?' <span style="font-size:10px;color:var(--muted);letter-spacing:.06em">ADDED</span>':'')+'</div><div class="focus">'+esc(a.focus)+'</div>'+
+        (a.web?'<a class="web" href="https://'+a.web+'" target="_blank" rel="noopener">'+a.web+'</a>':"")+
         (a.phone?'<span style="color:var(--muted);font-size:12px"> · ☎ '+esc(a.phone)+'</span>':"")+'</div>'+
         '<div><input placeholder="Contact name (optional)" value="'+esc(a.contact)+'" onchange="upd(\''+a.id+'\',\'contact\',this.value)">'+
         '<input placeholder="Retail leasing email" value="'+esc(a.email)+'" onchange="upd(\''+a.id+'\',\'email\',this.value)"></div>'+
         '<div><select onchange="setStage(\''+a.id+'\',this.value)">'+STAGES.map(s=>'<option'+(s===a.stage?' selected':'')+'>'+s+'</option>').join("")+'</select>'+badge+'</div>'+
         '<div class="btnrow">'+nextBtn+
         (["Responded","Options received"].includes(a.stage)?'<button class="btn" onclick="prefillQualify(\''+a.id+'\')">Qualify their option</button>':"")+
+        (a.custom?'<button class="btn ghost" onclick="deleteAgency(\''+a.id+'\')">✕</button>':"")+
         '</div></div>';
     });
   });
@@ -506,6 +534,29 @@ function renderPipe(){
 }
 function upd(id,k,v){ const a=state.agencies.find(x=>x.id===id); a[k]=v.trim(); save(); }
 function setStage(id,s){ const a=state.agencies.find(x=>x.id===id); a.stage=s; if(["Outreach sent","Follow-up 1 sent","Follow-up 2 sent"].includes(s)) a.last=new Date().toISOString(); save(); render(); }
+
+/* ---------- ADD / REMOVE AGENCIES ---------- */
+function openAgencyForm(){ $("agOverlay").classList.add("open"); }
+function closeAgencyForm(){ $("agOverlay").classList.remove("open"); ["ag_name","ag_web","ag_focus","ag_contact","ag_email","ag_phone"].forEach(i=>$(i).value=""); }
+function saveAgency(){
+  const name=$("ag_name").value.trim();
+  if(!name){ toast("Agency name is required"); return; }
+  const g=$("ag_group").value;
+  state.agencies.push({
+    id:"custom-"+Date.now(), g, name,
+    focus:$("ag_focus").value.trim()||"Added manually",
+    web:$("ag_web").value.trim().replace(/^https?:\/\//,""),
+    contact:$("ag_contact").value.trim(), email:$("ag_email").value.trim(), phone:$("ag_phone").value.trim(),
+    stage:STAGES[0], last:null, notes:"", custom:true
+  });
+  save(); render(); closeAgencyForm(); toast(name+" added to "+g);
+}
+function deleteAgency(id){
+  const a=state.agencies.find(x=>x.id===id); if(!a) return;
+  if(!confirm("Remove "+a.name+" from the pipeline? Its logged options stay in the shortlist.")) return;
+  state.agencies=state.agencies.filter(x=>x.id!==id);
+  save(); render(); toast(a.name+" removed");
+}
 
 /* ---------- EMAIL MODAL ---------- */
 function openEmail(id,type){
