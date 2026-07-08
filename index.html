@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -516,7 +515,7 @@ const DEFAULT_AGENCIES = [
  {id:"reemmall",g:"Mall Landlords — Direct",name:"Reem Mall Leasing",focus:"Landlord — Reem Mall, Al Reem Island (leasing enquiry via website)",web:"reemmall.ae",email:"",phone:""}
 ];
 
-const STAGES=["Not contacted","Outreach sent","Follow-up 1 sent","Follow-up 2 sent","Responded","Options received","No fit / closed"];
+const STAGES=["Not contacted","Outreach sent","Follow-up 1 sent","Follow-up 2 sent","Responded","Options received","Out of budget","No fit / closed"];
 const KEY="oxefit-agent-console-v1";
 let state={agencies:[],properties:[]};
 let pendingEmail=null, lastVerdict=null;
@@ -631,10 +630,13 @@ function renderDash(){
   const resp=ag.filter(a=>["Responded","Options received"].includes(a.stage)).length;
   const opts=state.properties.length;
   const passing=state.properties.filter(p=>p.verdict==="PASS").length;
+  const overBudget=ag.filter(a=>a.stage==="Out of budget").length;
+  const closed=ag.filter(a=>a.stage==="No fit / closed").length;
   $("dash").innerHTML=
    card(ag.length,"Agencies & landlords")+card(sent,"Outreach sent")+
    card(due,"Follow-ups due",due>0)+card(resp,"Responded")+
-   card(opts,"Options logged")+card(passing,"Passing spec");
+   card(opts,"Options logged")+card(passing,"Passing spec")+
+   card(overBudget,"Out of budget",overBudget>0)+card(closed,"No fit / closed");
   function card(n,l,alert){return '<div class="card"><div class="n'+(alert?' alert':'')+'">'+n+'</div><div class="l">'+l+'</div></div>';}
 }
 function renderPipe(){
@@ -646,7 +648,8 @@ function renderPipe(){
       const due=followupDue(a);
       const badge = due?'<span class="badge due">⚑ '+due+'</span>'
         : (["Responded","Options received"].includes(a.stage)?'<span class="badge resp">'+a.stage+'</span>'
-        : '<span class="badge">'+a.stage+(a.last?' · '+daysSince(a.last)+'d ago':'')+'</span>');
+        : (a.stage==="Out of budget"?'<span class="badge due" style="border-color:var(--warn);color:var(--warn)">Out of budget</span>'
+        : '<span class="badge">'+a.stage+(a.last?' · '+daysSince(a.last)+'d ago':'')+'</span>'));
       let nextBtn="";
       if(a.stage==="Not contacted") nextBtn='<button class="btn solid" onclick="openEmail(\''+a.id+'\',\'init\')">Generate outreach</button>';
       else if(due==="Follow-up 1 due"||a.stage==="Outreach sent") nextBtn='<button class="btn'+(due?' solid':'')+'" onclick="openEmail(\''+a.id+'\',\'fu1\')">Follow-up 1</button>';
